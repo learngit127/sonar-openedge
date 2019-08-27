@@ -48,17 +48,16 @@ import javax.xml.transform.sax.SAXSource;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.prorefactor.core.ABLNodeType;
+import org.prorefactor.core.JPNode;
 import org.prorefactor.core.JsonNodeLister;
 import org.prorefactor.core.ProToken;
 import org.prorefactor.core.ProparseRuntimeException;
 import org.prorefactor.proparse.antlr4.IncludeFileNotFoundException;
 import org.prorefactor.proparse.antlr4.Proparse;
 import org.prorefactor.proparse.antlr4.ProparseListener;
-import org.prorefactor.proparse.antlr4.TreeParser;
 import org.prorefactor.proparse.antlr4.XCodedFileException;
 import org.prorefactor.refactor.RefactorSession;
 import org.prorefactor.treeparser.ParseUnit;
-import org.prorefactor.treeparser.TreeParserSymbolScope;
 import org.sonar.api.SonarProduct;
 import org.sonar.api.batch.fs.FilePredicates;
 import org.sonar.api.batch.fs.InputFile;
@@ -303,9 +302,7 @@ public class OpenEdgeProparseSensor implements Sensor {
       unit.attachXref(doc);
       unit.attachXref(xref);
       unit.attachTransactionBlocks(trxBlocks);
-      // TODO Move - Should be available in treeparser
-      if (unit.getRootScope() != null)
-        unit.attachTypeInfo(session.getTypeInfo(unit.getRootScope().getClassName()));
+      unit.attachTypeInfo(session.getTypeInfo(unit.getClassName()));
       updateParseTime(System.currentTimeMillis() - startTime);
     } catch (UncheckedIOException caught) {
       numFailures++;
@@ -522,39 +519,43 @@ public class OpenEdgeProparseSensor implements Sensor {
     int numProcs = 0;
     int numFuncs = 0;
     int numMethds = 0;
-    for (TreeParserSymbolScope child : unit.getRootScope().getChildScopesDeep()) {
-      int scopeType = child.getRootBlock().getNode().getType();
-      switch (scopeType) {
-        case Proparse.PROCEDURE:
+
+    for (JPNode node : unit.getTopNode().query(ABLNodeType.PROCEDURE, ABLNodeType.FUNCTION, ABLNodeType.METHOD)) {
+      if ((node.getPreviousNode() != null) && (node.getPreviousNode().getNodeType() == ABLNodeType.END))
+        continue;
+      switch (node.getNodeType()) {
+        case PROCEDURE:
           boolean externalProc = false;
-          /* FIXME for (JPNode node : child.getRootBlock().getNode().getDirectChildren()) {
-            if ((node.getType() == ProParserTokenTypes.IN_KW) || (node.getType() == ProParserTokenTypes.SUPER)
-                || (node.getType() == ProParserTokenTypes.EXTERNAL)) {
+          for (JPNode child : node.getDirectChildren()) {
+            if ((child.getNodeType() == ABLNodeType.IN) || (child.getNodeType() == ABLNodeType.SUPER)
+                || (child.getNodeType() == ABLNodeType.EXTERNAL)) {
               externalProc = true;
             }
-          } */
+          }
           if (!externalProc) {
             numProcs++;
           }
           break;
-        case Proparse.FUNCTION:
+        case FUNCTION:
           boolean externalFunc = false;
-          /* FIXME for (JPNode node : child.getRootBlock().getNode().getDirectChildren()) {
-            if ((node.getType() == ProParserTokenTypes.IN_KW) || (node.getType() == ProParserTokenTypes.FORWARDS)) {
+          for (JPNode child : node.getDirectChildren()) {
+            if ((child.getNodeType() == ABLNodeType.IN) || (child.getNodeType() == ABLNodeType.FORWARDS)) {
               externalFunc = true;
             }
-          } */
+          }
           if (!externalFunc) {
             numFuncs++;
           }
           break;
-        case Proparse.METHOD:
+        case METHOD:
           numMethds++;
           break;
         default:
-
+          // Nope
+          break;
       }
     }
+
     context.newMeasure().on(file).forMetric((Metric) OpenEdgeMetrics.INTERNAL_PROCEDURES).withValue(numProcs).save();
     context.newMeasure().on(file).forMetric((Metric) OpenEdgeMetrics.INTERNAL_FUNCTIONS).withValue(numFuncs).save();
     context.newMeasure().on(file).forMetric((Metric) OpenEdgeMetrics.METHODS).withValue(numMethds).save();
@@ -563,12 +564,12 @@ public class OpenEdgeProparseSensor implements Sensor {
   @SuppressWarnings({"unchecked", "rawtypes"})
   private void computeComplexity(SensorContext context, InputFile file, ParseUnit unit) {
     // Interfaces don't contribute to complexity
-    if (unit.getRootScope().isInterface())
+    if (unit.isInterface())
       return;
     int complexity = 0;
     int complexityWithInc = 0;
     // Procedure has a main block, so starting at 1
-    if (!unit.getRootScope().isClass()) {
+    if (!unit.isClass()) {
       complexity++;
       complexityWithInc++;
     }
@@ -584,10 +585,10 @@ public class OpenEdgeProparseSensor implements Sensor {
   }
 
   private static class TreeParserModule implements Module {
-    private final Class instanceName;
+    private final Class<? extends ProparseListener> instanceName;
     private final ParseUnit unit;
 
-    public TreeParserModule(Class instName, ParseUnit unit) {
+    public TreeParserModule(Class<? extends ProparseListener> instName, ParseUnit unit) {
       this.instanceName = instName;
       this.unit = unit;
     }
@@ -595,7 +596,7 @@ public class OpenEdgeProparseSensor implements Sensor {
     @Override
     public void configure(Binder binder) {
       binder.bind(ParseUnit.class).toInstance(unit);
-      binder.bind(ProparseListener.class).to(TreeParser.class);
+      binder.bind(ProparseListener.class).to(instanceName);
     }
   }
 }

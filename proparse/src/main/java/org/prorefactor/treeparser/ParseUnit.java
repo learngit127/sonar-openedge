@@ -95,6 +95,11 @@ public class ParseUnit {
   private List<Integer> trxBlocks;
   private ParserSupport support;
 
+  private boolean isClass;
+  private boolean isInterface;
+  private boolean isAbstract;
+  private String className;
+
   public ParseUnit(File file, RefactorSession session) {
     this(file, file.getPath(), session);
   }
@@ -214,8 +219,12 @@ public class ParseUnit {
       tree = parser.program();
     }
     lexer.parseComplete();
-    topNode = (ProgramRootNode) new JPNodeVisitor(parser.getParserSupport(),
-        (BufferedTokenStream) parser.getInputStream()).visit(tree).build(parser.getParserSupport());
+    JPNodeVisitor visitor = new JPNodeVisitor(parser.getParserSupport(), (BufferedTokenStream) parser.getInputStream());
+    topNode = (ProgramRootNode) visitor.visit(tree).build(parser.getParserSupport());
+    isClass = visitor.isClass();
+    isInterface = visitor.isInterface();
+    isAbstract = visitor.isAbstractClass();
+    className = visitor.getClassName();
 
     fileNameList = lexer.getFilenameList();
     macroGraph = lexer.getMacroGraph();
@@ -365,6 +374,22 @@ public class ParseUnit {
 
   public boolean isAppBuilderCode() {
     return appBuilderCode;
+  }
+
+  public boolean isClass() {
+    return isClass;
+  }
+
+  public boolean isInterface() {
+    return isInterface;
+  }
+
+  public boolean isAbstractClass() {
+    return isAbstract;
+  }
+
+  public String getClassName() {
+    return className;
   }
 
   public boolean isInEditableSection(int file, int line) {
