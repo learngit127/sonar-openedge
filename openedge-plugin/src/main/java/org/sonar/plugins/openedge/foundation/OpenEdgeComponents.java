@@ -29,9 +29,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
+import org.prorefactor.proparse.antlr4.ProparseListener;
 import org.sonar.api.SonarProduct;
 import org.sonar.api.batch.ScannerSide;
 import org.sonar.api.batch.rule.ActiveRule;
@@ -67,6 +69,8 @@ public class OpenEdgeComponents {
 
   private final CheckRegistrar checkRegistrar = new CheckRegistrar();
   private final LicenseRegistrar licenseRegistrar = new LicenseRegistrar();
+  private final TreeParserRegistrar parserRegistrar = new TreeParserRegistrar();
+
   private boolean initialized = false;
 
   public OpenEdgeComponents() {
@@ -82,11 +86,19 @@ public class OpenEdgeComponents {
   }
 
   public OpenEdgeComponents(CheckRegistration[] checkRegistrars, LicenseRegistration[] licRegistrars) {
+    this(checkRegistrars, licRegistrars, null);
+  }
+
+  public OpenEdgeComponents(CheckRegistration[] checkRegistrars, LicenseRegistration[] licRegistrars,
+      TreeParserRegistration[] tpRegistrars) {
     if (checkRegistrars != null) {
       registerChecks(checkRegistrars);
     }
     if (licRegistrars != null) {
       registerLicences(licRegistrars);
+    }
+    if (tpRegistrars != null) {
+      registerTreeParser(tpRegistrars);
     }
   }
 
@@ -100,6 +112,16 @@ public class OpenEdgeComponents {
     for (LicenseRegistration registration : registrations) {
       registration.register(licenseRegistrar);
     }
+  }
+
+  private void registerTreeParser(TreeParserRegistration[] registrations) {
+    for (TreeParserRegistration registration : registrations) {
+      registration.register(parserRegistrar);
+    }
+  }
+
+  public Iterable<Class<? extends ProparseListener>> getProparseListeners() {
+    return Collections.unmodifiableList(parserRegistrar.allListeners);
   }
 
   public Iterable<License> getLicenses() {
@@ -319,4 +341,14 @@ public class OpenEdgeComponents {
       return null;
     }
   }
+
+  private static class TreeParserRegistrar implements TreeParserRegistration.Registrar {
+    private final List<Class<? extends ProparseListener>> allListeners = new ArrayList<>();
+
+    @Override
+    public void registerTreeParser(Class<? extends ProparseListener> listener) {
+      allListeners.add(listener);
+    }
+  }
+
 }

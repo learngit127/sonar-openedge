@@ -53,6 +53,7 @@ import org.prorefactor.proparse.antlr4.JPNodeVisitor;
 import org.prorefactor.proparse.antlr4.ProgressLexer;
 import org.prorefactor.proparse.antlr4.Proparse;
 import org.prorefactor.proparse.antlr4.ProparseErrorStrategy;
+import org.prorefactor.proparse.antlr4.ProparseListener;
 import org.prorefactor.proparse.antlr4.TreeParser;
 import org.prorefactor.refactor.RefactorSession;
 import org.slf4j.Logger;
@@ -135,7 +136,7 @@ public class ParseUnit {
     return Strings.nullToEmpty(fileNameList.getValue(index));
   }
 
-  /** 
+  /**
    * @return IncludeRef object
    */
   public @Nullable IncludeRef getMacroGraph() {
@@ -229,10 +230,13 @@ public class ParseUnit {
   public void treeParser01() {
     if (topNode == null)
       parse();
-    ParseTreeWalker walker = new ParseTreeWalker();
-    TreeParser parser = new TreeParser(support, session);
-    walker.walk(parser, tree);
-    rootScope = parser.getRootScope();
+    treeParser(new TreeParser(this));
+  }
+
+  public void treeParser(ProparseListener listener) {
+    if (topNode == null)
+      parse();
+    new ParseTreeWalker().walk(listener, tree);
   }
 
   public void attachXref(Document doc) {

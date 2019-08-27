@@ -30,6 +30,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
+import org.prorefactor.proparse.antlr4.TreeParser;
 import org.prorefactor.refactor.settings.ProparseSettings.OperatingSystem;
 import org.sonar.api.SonarQubeSide;
 import org.sonar.api.batch.rule.internal.ActiveRulesBuilder;
@@ -39,6 +40,7 @@ import org.sonar.api.rule.RuleKey;
 import org.sonar.api.utils.Version;
 import org.sonar.plugins.openedge.api.CheckRegistration;
 import org.sonar.plugins.openedge.api.Constants;
+import org.sonar.plugins.openedge.api.TreeParserRegistration;
 import org.sonar.plugins.openedge.checks.ClumsySyntax;
 import org.sonar.plugins.openedge.foundation.BasicChecksRegistration;
 import org.sonar.plugins.openedge.foundation.OpenEdgeComponents;
@@ -49,6 +51,12 @@ import org.testng.annotations.Test;
 
 public class OpenEdgeProparseSensorTest {
   private static final Version VERSION = Version.parse("7.5");
+  private static final TreeParserRegistration TREE_PARSER_REG = new TreeParserRegistration() {
+    @Override
+    public void register(Registrar registrar) {
+      registrar.registerTreeParser(TreeParser.class);
+    }
+  };
 
   @SuppressWarnings("deprecation")
   @Test
@@ -57,8 +65,9 @@ public class OpenEdgeProparseSensorTest {
     context.settings().setProperty(Constants.CPD_ANNOTATIONS, "Generated,rssw.lang.Generated");
     context.settings().setProperty(Constants.CPD_METHODS, "TEST3");
     context.settings().setProperty(Constants.CPD_PROCEDURES, "adm-create-objects");
-    OpenEdgeSettings oeSettings = new OpenEdgeSettings(context.config(), context.fileSystem(), SonarRuntimeImpl.forSonarQube(VERSION, SonarQubeSide.SCANNER));
-    OpenEdgeComponents components = new OpenEdgeComponents(null, null);
+    OpenEdgeSettings oeSettings = new OpenEdgeSettings(context.config(), context.fileSystem(),
+        SonarRuntimeImpl.forSonarQube(VERSION, SonarQubeSide.SCANNER));
+    OpenEdgeComponents components = new OpenEdgeComponents(null, null, new TreeParserRegistration[] {TREE_PARSER_REG});
     OpenEdgeProparseSensor sensor = new OpenEdgeProparseSensor(oeSettings, components);
     sensor.execute(context);
 

@@ -53,6 +53,8 @@ import org.prorefactor.core.ProToken;
 import org.prorefactor.core.ProparseRuntimeException;
 import org.prorefactor.proparse.antlr4.IncludeFileNotFoundException;
 import org.prorefactor.proparse.antlr4.Proparse;
+import org.prorefactor.proparse.antlr4.ProparseListener;
+import org.prorefactor.proparse.antlr4.TreeParser;
 import org.prorefactor.proparse.antlr4.XCodedFileException;
 import org.prorefactor.refactor.RefactorSession;
 import org.prorefactor.treeparser.ParseUnit;
@@ -290,18 +292,27 @@ public class OpenEdgeProparseSensor implements Sensor {
 
     try {
       unit = new ParseUnit(InputFileUtils.getInputStream(file), InputFileUtils.getRelativePath(file, context.fileSystem()), session);
-      unit.treeParser01();
+      unit.parse();
+
+      for (Class<? extends ProparseListener> clz : components.getProparseListeners()) {
+        Injector injector = Guice.createInjector(new TreeParserModule(clz, unit));
+        ProparseListener listener = injector.getInstance(ProparseListener.class);
+        unit.treeParser(listener);
+      }
+
       unit.attachXref(doc);
       unit.attachXref(xref);
       unit.attachTransactionBlocks(trxBlocks);
-      unit.attachTypeInfo(session.getTypeInfo(unit.getRootScope().getClassName()));
+      // TODO Move - Should be available in treeparser
+      if (unit.getRootScope() != null)
+        unit.attachTypeInfo(session.getTypeInfo(unit.getRootScope().getClassName()));
       updateParseTime(System.currentTimeMillis() - startTime);
     } catch (UncheckedIOException caught) {
       numFailures++;
-      if ((caught.getCause() != null) && (caught.getCause() instanceof XCodedFileException)) {
+      if (caught.getCause() instanceof XCodedFileException) {
         XCodedFileException cause = (XCodedFileException) caught.getCause();
         LOG.error("Unable to parse {} - Can't read xcode'd file {}", file, cause.getFileName());
-      } else if ((caught.getCause() != null) && (caught.getCause() instanceof IncludeFileNotFoundException)) {
+      } else if (caught.getCause() instanceof IncludeFileNotFoundException) {
         IncludeFileNotFoundException cause = (IncludeFileNotFoundException) caught.getCause();
         LOG.error("Unable to parse {} - Can't find include file '{}' from '{}'", file, cause.getIncludeName(), cause.getFileName());
       } else {
@@ -326,7 +337,7 @@ public class OpenEdgeProparseSensor implements Sensor {
         try {
           strt = file.newPointer(tok.getLine(), tok.getCharPositionInLine() - 1);
           end = file.newPointer(tok.getLine(), tok.getCharPositionInLine());
-        } catch (IllegalArgumentException uncaught) { // NO-SONAR
+        } catch (IllegalArgumentException uncaught) {
           // Nothing
         }
       }
@@ -572,4 +583,19 @@ public class OpenEdgeProparseSensor implements Sensor {
     context.newMeasure().on(file).forMetric((Metric) OpenEdgeMetrics.COMPLEXITY).withValue(complexityWithInc).save();
   }
 
+  private static class TreeParserModule implements Module {
+    private final Class instanceName;
+    private final ParseUnit unit;
+
+    public TreeParserModule(Class instName, ParseUnit unit) {
+      this.instanceName = instName;
+      this.unit = unit;
+    }
+
+    @Override
+    public void configure(Binder binder) {
+      binder.bind(ParseUnit.class).toInstance(unit);
+      binder.bind(ProparseListener.class).to(TreeParser.class);
+    }
+  }
 }
