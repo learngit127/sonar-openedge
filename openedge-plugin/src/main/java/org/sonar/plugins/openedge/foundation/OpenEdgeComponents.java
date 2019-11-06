@@ -50,6 +50,7 @@ import org.sonar.plugins.openedge.api.InvalidLicenseException;
 import org.sonar.plugins.openedge.api.LicenseRegistration;
 import org.sonar.plugins.openedge.api.LicenseRegistration.License;
 import org.sonar.plugins.openedge.api.LicenseRegistration.LicenseType;
+import org.sonar.plugins.openedge.api.TreeParserRegistration;
 import org.sonar.plugins.openedge.api.checks.OpenEdgeCheck;
 import org.sonar.plugins.openedge.api.checks.OpenEdgeCheck.CheckType;
 import org.sonar.plugins.openedge.api.checks.OpenEdgeDumpFileCheck;

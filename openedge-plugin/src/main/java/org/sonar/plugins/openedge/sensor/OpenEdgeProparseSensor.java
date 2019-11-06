@@ -92,6 +92,10 @@ import org.xml.sax.XMLReader;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.io.ByteStreams;
+import com.google.inject.Binder;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Module;
 import com.progress.xref.CrossReference;
 
 import eu.rssw.listing.CodeBlock;
