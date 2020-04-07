@@ -16,11 +16,17 @@
 package org.prorefactor.refactor;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.lang.reflect.Type;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.annotation.Nullable;
 
@@ -30,9 +36,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Strings;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
 
 import eu.rssw.pct.elements.ITypeInfo;
+import eu.rssw.pct.elements.fixed.MethodElement;
+import eu.rssw.pct.elements.fixed.PropertyElement;
+import eu.rssw.pct.elements.fixed.TypeInfo;
 
 /**
  * This class provides an interface to an org.prorefactor.refactor session. Much of this class was originally put in
@@ -47,6 +59,8 @@ public class RefactorSession {
 
   // Structure from rcode
   private final Map<String, ITypeInfo> typeInfoMap = Collections.synchronizedMap(new HashMap<>());
+  // Read from assembly catalog
+  private final Map<String, ITypeInfo> classInfo = new HashMap<>();
   // Cached entries from propath
   private final Map<String, File> propathCache = new HashMap<>();
   // Cached entries from propath again
@@ -62,6 +76,36 @@ public class RefactorSession {
     this.proparseSettings = proparseSettings;
     this.schema = schema;
     this.charset = charset;
+    initializeProgressClasses();
+  }
+
+  private void initializeProgressClasses() {
+    Gson gson = new GsonBuilder().create();
+    try (Reader reader = new InputStreamReader(this.getClass().getResourceAsStream("/libraries.json"))) {
+      Type type = new TypeToken<HashMap<String, ClassInfo>>(){}.getType();
+      Map<String, ClassInfo> classInfoMap = gson.fromJson(reader, type); 
+      for (Entry<String, ClassInfo> info : classInfoMap.entrySet()) {
+        String parentType = info.getValue().baseTypes.length > 0 ? info.getValue().baseTypes[0] : null;
+        String[] interfaces = info.getValue().baseTypes.length > 1 ? Arrays.copyOfRange(info.getValue().baseTypes, 1, info.getValue().baseTypes.length) : new String[] {} ;
+        TypeInfo typeInfo = new TypeInfo(info.getKey() , info.getValue().isInterface, info.getValue().isAbstract, parentType, "", interfaces);
+        for (String str : info.getValue().methods) {
+          typeInfo.addMethod(new MethodElement(str, false));
+        }
+        for (String str : info.getValue().staticMethods) {
+          typeInfo.addMethod(new MethodElement(str, true));
+        }
+
+        for (String str : info.getValue().properties) {
+          typeInfo.addProperty(new PropertyElement(str, false));
+        }
+        for (String str : info.getValue().staticProperties) {
+          typeInfo.addProperty(new PropertyElement(str, true));
+        }
+        classInfo.put(typeInfo.getTypeName(), typeInfo);
+      }
+    } catch (IOException uncaught) {
+      LOG.error("Unable to read libraries.json", uncaught);
+    }
   }
 
   public Charset getCharset() {
@@ -85,6 +129,9 @@ public class RefactorSession {
       return null;
     }
     ITypeInfo info = typeInfoMap.get(clz);
+    if (info == null) {
+      info = classInfo.get(clz);
+    }
     if (info == null) {
       LOG.debug("No TypeInfo found for {}", clz);
     }
@@ -155,5 +202,17 @@ public class RefactorSession {
     int len = fileName.length();
     return ((len > 0) && (fileName.charAt(0) == '/' || fileName.charAt(0) == '\\'))
         || ((len > 1) && (fileName.charAt(1) == ':' || fileName.charAt(0) == '.'));
+  }
+
+  private class ClassInfo {
+    String[] baseTypes;
+    boolean isAbstract;
+    boolean isClass;
+    boolean isEnum;
+    boolean isInterface;
+    String[] properties;
+    String[] methods;
+    String[] staticMethods;
+    String[] staticProperties;
   }
 }
