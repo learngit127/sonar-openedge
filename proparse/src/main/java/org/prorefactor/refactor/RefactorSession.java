@@ -19,14 +19,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.lang.reflect.Type;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import javax.annotation.Nullable;
 
@@ -38,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Strings;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
 
 import eu.rssw.pct.elements.ITypeInfo;
@@ -80,31 +77,41 @@ public class RefactorSession {
   }
 
   private void initializeProgressClasses() {
-    Gson gson = new GsonBuilder().create();
     try (Reader reader = new InputStreamReader(this.getClass().getResourceAsStream("/libraries.json"))) {
-      Type type = new TypeToken<HashMap<String, ClassInfo>>(){}.getType();
-      Map<String, ClassInfo> classInfoMap = gson.fromJson(reader, type); 
-      for (Entry<String, ClassInfo> info : classInfoMap.entrySet()) {
-        String parentType = info.getValue().baseTypes.length > 0 ? info.getValue().baseTypes[0] : null;
-        String[] interfaces = info.getValue().baseTypes.length > 1 ? Arrays.copyOfRange(info.getValue().baseTypes, 1, info.getValue().baseTypes.length) : new String[] {} ;
-        TypeInfo typeInfo = new TypeInfo(info.getKey() , info.getValue().isInterface, info.getValue().isAbstract, parentType, "", interfaces);
-        for (String str : info.getValue().methods) {
-          typeInfo.addMethod(new MethodElement(str, false));
-        }
-        for (String str : info.getValue().staticMethods) {
-          typeInfo.addMethod(new MethodElement(str, true));
-        }
-
-        for (String str : info.getValue().properties) {
-          typeInfo.addProperty(new PropertyElement(str, false));
-        }
-        for (String str : info.getValue().staticProperties) {
-          typeInfo.addProperty(new PropertyElement(str, true));
-        }
-        classInfo.put(typeInfo.getTypeName(), typeInfo);
-      }
+      injectClassesFromCatalog(reader);
     } catch (IOException uncaught) {
       LOG.error("Unable to read libraries.json", uncaught);
+    }
+  }
+
+  public void injectClassesFromCatalog(Reader reader) {
+    Gson gson = new GsonBuilder().create();
+    for (ClassInfo info : gson.fromJson(reader, ClassInfo[].class)) {
+      String parentType = info.baseTypes != null && info.baseTypes.length > 0 ? info.baseTypes[0] : null;
+      String[] interfaces = info.baseTypes != null && info.baseTypes.length > 1
+          ? Arrays.copyOfRange(info.baseTypes, 1, info.baseTypes.length) : new String[] {};
+      TypeInfo typeInfo = new TypeInfo(info.name, info.isInterface, info.isAbstract, parentType, "", interfaces);
+      if (info.methods != null) {
+        for (String str : info.methods) {
+          typeInfo.addMethod(new MethodElement(str, false));
+        }
+      }
+      if (info.staticMethods != null) {
+        for (String str : info.staticMethods) {
+          typeInfo.addMethod(new MethodElement(str, true));
+        }
+      }
+      if (info.properties != null) {
+        for (String str : info.properties) {
+          typeInfo.addProperty(new PropertyElement(str, false));
+        }
+      }
+      if (info.staticProperties != null) {
+        for (String str : info.staticProperties) {
+          typeInfo.addProperty(new PropertyElement(str, true));
+        }
+      }
+      classInfo.put(typeInfo.getTypeName(), typeInfo);
     }
   }
 
@@ -205,9 +212,12 @@ public class RefactorSession {
   }
 
   private class ClassInfo {
+    String name;
     String[] baseTypes;
     boolean isAbstract;
+    @SuppressWarnings("unused")
     boolean isClass;
+    @SuppressWarnings("unused")
     boolean isEnum;
     boolean isInterface;
     String[] properties;

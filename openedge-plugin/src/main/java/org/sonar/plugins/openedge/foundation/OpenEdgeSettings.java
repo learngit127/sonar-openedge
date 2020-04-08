@@ -23,6 +23,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -615,6 +616,15 @@ public class OpenEdgeSettings {
           config.getBoolean("sonar.oe.proparse.recover").orElse(runtime.getProduct() == SonarProduct.SONARQUBE));
 
       proparseSession = new RefactorSession(ppSettings, sch, encoding());
+      Optional<String> assemblyCatalog = config.get(Constants.ASSEMBLY_CATALOG);
+      if (assemblyCatalog.isPresent()) {
+        try (Reader reader = new FileReader(assemblyCatalog.get())) {
+          proparseSession.injectClassesFromCatalog(reader);
+        } catch (IOException caught) {
+          LOG.error("Unable to read assembly catalog '" + assemblyCatalog.get() + "'", caught);
+        }
+      }
+
       if (runtime.getProduct() == SonarProduct.SONARQUBE) {
         // Parse entire build directory if not in SonarLint
         parseBuildDirectory();
