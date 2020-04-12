@@ -20,10 +20,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nullable;
@@ -144,6 +146,22 @@ public class RefactorSession {
     }
 
     return info;
+  }
+
+  public List<String> getAllClassesFromPackage(String pkgName) {
+    if (Strings.isNullOrEmpty(pkgName))
+      return Collections.emptyList();
+    List<String> retVal = new ArrayList<>();
+    for (String type : typeInfoMap.keySet()) {
+      if (type.startsWith(pkgName + "."))
+        retVal.add(type);
+    }
+    for (String type : classInfo.keySet()) {
+      if (type.startsWith(pkgName + "."))
+        retVal.add(type);
+    }
+
+    return retVal;
   }
 
   public void injectTypeInfoCollection(Collection<ITypeInfo> units) {

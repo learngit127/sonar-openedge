@@ -28,7 +28,7 @@ public class ClassFinder {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClassFinder.class);
 
   private RefactorSession session;
-  private List<String> paths = new ArrayList<>();
+  // private List<String> paths = new ArrayList<>();
   private Map<String, String> namesMap = new HashMap<>();
 
   public ClassFinder(RefactorSession session) {
@@ -44,14 +44,30 @@ public class ClassFinder {
     if (dequoted.length() == 0)
       return;
     if (dequoted.endsWith("*")) {
-      paths.add(dequoted.replace('.', '/').substring(0, dequoted.length() - 1));
+      String pkgName = dequoted.replace('.', '/').substring(0, dequoted.length() - 1);
+      for (String str : session.getAllClassesFromPackage(pkgName)) {
+        addQualifiedName(str);
+      }
+      // paths.add(dequoted.replace('.', '/').substring(0, dequoted.length() - 1));
     } else {
-      int dotPos = dequoted.lastIndexOf('.');
+      /* int dotPos = dequoted.lastIndexOf('.');
       String unqualified = dotPos > 0 ? dequoted.substring(dotPos + 1) : dequoted;
       unqualified = unqualified.toLowerCase();
       // First match takes precedence.
       if (!namesMap.containsKey(unqualified))
-        namesMap.put(unqualified, dequoted);
+        namesMap.put(unqualified, dequoted);*/
+      addQualifiedName(dequoted);
+    }
+  }
+
+  private void addQualifiedName(String qName) {
+    int dotPos = qName.lastIndexOf('.');
+    String unqualified = dotPos > 0 ? qName.substring(dotPos + 1) : qName;
+    unqualified = unqualified.toLowerCase();
+    // First match takes precedence.
+    if (!namesMap.containsKey(unqualified)) {
+      LOGGER.info("Adding {} for {}", unqualified, qName);
+      namesMap.put(unqualified, qName);
     }
   }
 
@@ -110,13 +126,13 @@ public class ClassFinder {
       return ret;
 
     // Check USING package globs and classes injected in RefactorSession
-    for (String path : paths) {
+    /*for (String path : paths) {
       if (session.getTypeInfo(path.replace('/', '.') + dequotedName) != null)
         return path.replace('/', '.') + dequotedName;
-    }
+    }*/
 
     // Check USING package globs and files on the PROPATH.
-    String withExtension = dequotedName + ".cls";
+    /* String withExtension = dequotedName + ".cls";
     for (String path : paths) {
       String classFile = session.findFile(path + withExtension);
       if (classFile.length() != 0) {
@@ -124,7 +140,7 @@ public class ClassFinder {
         namesMap.put(dequotedName.toLowerCase(), ret);
         return ret;
       }
-    }
+    } */
 
     // The last chance is for a "no package" name in RefactorSession and on the path
     if (session.getTypeInfo(dequotedName) != null)

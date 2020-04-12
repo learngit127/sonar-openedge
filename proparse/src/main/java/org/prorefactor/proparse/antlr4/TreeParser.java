@@ -2710,8 +2710,8 @@ public class TreeParser extends ProparseBaseListener {
         result.getSymbol().noteReference(cq);
       }
     }
-    
-    if ((ctx2.ENTERED() == null) && !Strings.isNullOrEmpty(support.getClassName(ctx2.field().getText()))) {
+
+    if ((ctx2.ENTERED() == null) && !Strings.isNullOrEmpty(support.lookupClassName(ctx2.field().getText()))) {
       setContextQualifier(ctx2, ContextQualifier.STATIC);
     }
   }
