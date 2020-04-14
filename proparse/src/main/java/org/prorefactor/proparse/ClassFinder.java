@@ -44,7 +44,7 @@ public class ClassFinder {
     if (dequoted.length() == 0)
       return;
     if (dequoted.endsWith("*")) {
-      String pkgName = dequoted.replace('.', '/').substring(0, dequoted.length() - 1);
+      String pkgName = dequoted.substring(0, dequoted.length() - 2);
       for (String str : session.getAllClassesFromPackage(pkgName)) {
         addQualifiedName(str);
       }
@@ -66,7 +66,6 @@ public class ClassFinder {
     unqualified = unqualified.toLowerCase();
     // First match takes precedence.
     if (!namesMap.containsKey(unqualified)) {
-      LOGGER.info("Adding {} for {}", unqualified, qName);
       namesMap.put(unqualified, qName);
     }
   }
@@ -125,30 +124,9 @@ public class ClassFinder {
     if (ret != null)
       return ret;
 
-    // Check USING package globs and classes injected in RefactorSession
-    /*for (String path : paths) {
-      if (session.getTypeInfo(path.replace('/', '.') + dequotedName) != null)
-        return path.replace('/', '.') + dequotedName;
-    }*/
-
-    // Check USING package globs and files on the PROPATH.
-    /* String withExtension = dequotedName + ".cls";
-    for (String path : paths) {
-      String classFile = session.findFile(path + withExtension);
-      if (classFile.length() != 0) {
-        ret = path.replace('/', '.') + dequotedName;
-        namesMap.put(dequotedName.toLowerCase(), ret);
-        return ret;
-      }
-    } */
-
-    // The last chance is for a "no package" name in RefactorSession and on the path
+    // The last chance is for a "no package" name in RefactorSession
     if (session.getTypeInfo(dequotedName) != null)
       return dequotedName;
-    if (session.findFile(dequotedName + ".cls").length() > 0) {
-      namesMap.put(dequotedName.toLowerCase(), dequotedName);
-      return dequotedName;
-    }
 
     // No class source was found, return empty String.
     return "";

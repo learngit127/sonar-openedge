@@ -58,8 +58,11 @@ public class RefactorSession {
 
   // Structure from rcode
   private final Map<String, ITypeInfo> typeInfoMap = Collections.synchronizedMap(new HashMap<>());
-  // Read from assembly catalog
+  // Read from internal classes list and assembly catalog
   private final Map<String, ITypeInfo> classInfo = new HashMap<>();
+  // List of classes per package
+  private final Map<String, List<ITypeInfo>> classesPerPkg = new HashMap<>();
+
   // Cached entries from propath
   private final Map<String, File> propathCache = new HashMap<>();
   // Cached entries from propath again
@@ -114,6 +117,10 @@ public class RefactorSession {
         }
       }
       classInfo.put(typeInfo.getTypeName(), typeInfo);
+
+      int dotPos = info.name.lastIndexOf('.');
+      String pkgName = dotPos >= 1 ? info.name.substring(0, dotPos) : "";
+      classesPerPkg.computeIfAbsent(pkgName, key -> new ArrayList<>()).add(typeInfo);
     }
   }
 
@@ -151,14 +158,13 @@ public class RefactorSession {
   public List<String> getAllClassesFromPackage(String pkgName) {
     if (Strings.isNullOrEmpty(pkgName))
       return Collections.emptyList();
+    List<ITypeInfo> clsList = classesPerPkg.get(pkgName);
+    if (clsList == null)
+      return Collections.emptyList();
+
     List<String> retVal = new ArrayList<>();
-    for (String type : typeInfoMap.keySet()) {
-      if (type.startsWith(pkgName + "."))
-        retVal.add(type);
-    }
-    for (String type : classInfo.keySet()) {
-      if (type.startsWith(pkgName + "."))
-        retVal.add(type);
+    for (ITypeInfo info : clsList) {
+      retVal.add(info.getTypeName());
     }
 
     return retVal;
@@ -174,6 +180,10 @@ public class RefactorSession {
     if ((unit == null) || Strings.isNullOrEmpty(unit.getTypeName()))
       return;
     typeInfoMap.put(unit.getTypeName(), unit);
+
+    int dotPos = unit.getTypeName().lastIndexOf('.');
+    String pkgName = dotPos >= 1 ? unit.getTypeName().substring(0, dotPos) : "";
+    classesPerPkg.computeIfAbsent(pkgName, key -> new ArrayList<>()).add(unit);
   }
 
   public File findFile3(String fileName) {
